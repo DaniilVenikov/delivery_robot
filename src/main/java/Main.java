@@ -12,6 +12,26 @@ public class Main {
 
         ExecutorService executor = Executors.newFixedThreadPool(amountOfThreads);
 
+        Runnable runnable = () -> {
+            while (!Thread.interrupted()){
+                synchronized (sizeToFreq){
+                    try {
+                        sizeToFreq.wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    var max = sizeToFreq.entrySet()
+                            .stream()
+                            .max(Map.Entry.comparingByValue())
+                            .orElseThrow();
+                    System.out.printf("Текущий лидер среди частот: %d (встретился %d раз)%n", max.getKey(), max.getValue());
+                }
+            }
+        };
+
+        Thread thread =  new Thread(runnable);
+        thread.start();
+
         for (int i = 0; i < amountOfThreads; i++) {
                 Callable<Integer> callable = () -> (int)countR(generateRoute(letters, lengthLetter));
                 Future<Integer> future = executor.submit(callable);
@@ -19,9 +39,16 @@ public class Main {
                 if (sizeToFreq.containsKey(future.get())) {
                     sizeToFreq.put(future.get(), sizeToFreq.get(future.get()) + 1);
                 } else sizeToFreq.put(future.get(), 1);
+                sizeToFreq.notify();
             }
         }
+
+
+        thread.interrupt();
         executor.shutdown();
+
+
+
 
 
         SortedMap<Integer,Integer> sortedSizeToFreq = new TreeMap<>(Comparator.reverseOrder());
